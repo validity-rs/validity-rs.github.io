@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>validity-rs</title>
+<meta name="description" content="Fingerprint login on Linux for Synaptics/Validity match-on-chip readers (06cb:009a, ThinkPad T480). A Rust replacement for fprintd's daemon.">
+<style>
+:root{--bg:#fafaf8;--fg:#1d1f21;--muted:#5c6166;--card:#fff;--line:#e3e3df;--accent:#26608e;--code:#f2f2ee}
+@media (prefers-color-scheme:dark){:root{--bg:#141618;--fg:#e8e8e6;--muted:#a0a5aa;--card:#1c1f22;--line:#2c3034;--accent:#7fb3de;--code:#202428}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:46rem;margin:0 auto;padding:3rem 1rem 4rem}
+h1{font-size:2.2rem;margin:0 0 .25rem;letter-spacing:-.02em}
+h2{font-size:1.2rem;margin:2.5rem 0 .75rem}
+p.lead{font-size:1.15rem;color:var(--muted);margin:0 0 1.5rem}
+a{color:var(--accent)}
+.links{display:flex;flex-wrap:wrap;gap:.5rem;margin:1.5rem 0}
+.links a{border:1px solid var(--line);background:var(--card);padding:.45rem .9rem;border-radius:.5rem;text-decoration:none}
+figure{margin:2rem 0;text-align:center}
+figure img{max-width:100%;width:420px;border-radius:.6rem;border:1px solid var(--line)}
+figcaption{color:var(--muted);font-size:.9rem}
+ul{padding-left:1.2rem}
+pre{background:var(--code);border:1px solid var(--line);border-radius:.5rem;padding:.9rem 1rem;overflow-x:auto;font-size:.85rem;line-height:1.5}
+code{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+table{border-collapse:collapse;width:100%;font-size:.95rem}
+td,th{border-bottom:1px solid var(--line);padding:.45rem .3rem;text-align:left}
+footer{margin-top:3rem;color:var(--muted);font-size:.9rem}
+</style>
+</head>
+<body>
+<main>
+<h1>validity-rs</h1>
+<p class="lead">Fingerprint login on Linux for Synaptics/Validity match-on-chip readers. A drop-in, Rust replacement for fprintd's daemon, with a one-button app to register your finger.</p>
+
+<div class="links">
+<a href="https://github.com/validity-rs/validity-rs">Driver and service</a>
+<a href="https://github.com/validity-rs/fingerprint-settings">Fingerprints app</a>
+<a href="https://github.com/validity-rs/validity-rs/releases/latest">Downloads</a>
+<a href="https://validity-rs.github.io/apt/">APT repository</a>
+</div>
+
+<figure>
+<img src="screenshot.png" alt="The Fingerprints app: no fingerprint registered yet, one button to register the right index finger" width="420" height="420">
+<figcaption>The Fingerprints app (English and French).</figcaption>
+</figure>
+
+<h2>What it does</h2>
+<ul>
+<li>Speaks the reader's encrypted protocol itself: pairing, firmware, calibration, enrolment, matching. Fingerprints never leave the chip.</li>
+<li>Serves fprintd's D-Bus API, so <code>fprintd-enroll</code>, <code>fprintd-verify</code> and desktop tools keep working.</li>
+<li>Optional login profile: the password always works; the finger is an extra way in, never the only one.</li>
+<li>Signed, attested packages; updates through <code>apt</code>.</li>
+</ul>
+
+<h2>Supported</h2>
+<table>
+<tr><th>Reader</th><td><code>06cb:009a</code>, tested on a ThinkPad T480</td></tr>
+<tr><th>APT</th><td>Debian 13, Ubuntu 26.04, Ubuntu 24.04 (service only)</td></tr>
+<tr><th>Downloads</th><td>Fedora, Arch Linux, Alpine packages on the GitHub release</td></tr>
+</table>
+
+<h2>Install on Debian 13</h2>
+<pre><code>sudo apt install curl gpg
+curl -fsSLO https://validity-rs.github.io/apt/validity-rs-archive-keyring.gpg
+gpg --show-keys --with-fingerprint validity-rs-archive-keyring.gpg
+#   must show 59CB F35F 3147 A424 BE25  DF07 8F4B 8482 B486 C8FD
+sudo install -m 0644 validity-rs-archive-keyring.gpg /usr/share/keyrings/
+sudo curl -fsSL -o /etc/apt/sources.list.d/validity-rs.sources \
+    https://validity-rs.github.io/apt/validity-rs.sources
+sudo apt update
+sudo apt install validity-rs-archive-keyring validity-daemon fingerprint-settings</code></pre>
+<p>Ubuntu and the other distributions: see the <a href="https://github.com/validity-rs/validity-rs#install">install guide</a>.</p>
+
+<footer>MIT licensed. Protocol work builds on <a href="https://github.com/uunicorn/python-validity">python-validity</a>.</footer>
+</main>
+</body>
+</html>
