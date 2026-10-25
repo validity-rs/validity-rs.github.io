@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tool reference · validity-rs</title>
+<meta name="description" content="Reference for validity-daemon, validity-vendor, pam_validity.so and the Fingerprints app.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<nav><a href="./">← validity-rs</a> <a href="#daemon">validity-daemon</a> <a href="#vendor">validity-vendor</a> <a href="#pam">pam_validity.so</a> <a href="#app">Fingerprints</a> <a href="#fprintd">fprintd tools</a></nav>
+<h1>Tool reference</h1>
+<p class="lead">What each piece does, its options and files. Everything here runs on the machine; nothing calls home.</p>
+
+<h2 id="daemon">validity-daemon</h2>
+<p>The fingerprint service. It owns the bus name <code>net.reactivated.Fprint</code> on the system bus and speaks fprintd's D-Bus API, so every fprintd client works with it. The Debian and Ubuntu packages divert fprintd's D-Bus activation file to it; D-Bus starts it on demand (<code>validity-daemon.service</code>). It never pairs or erases the sensor by itself, and never downloads anything.</p>
+<pre><code>/usr/libexec/validity-daemon [OPTIONS]</code></pre>
+<dl>
+<dt>--config PATH</dt><dd>Configuration file (default <code>/etc/validity/validity.toml</code>, used only if present).</dd>
+<dt>--vendor-dll PATH</dt><dd>Synaptics driver DLL with the sensor command blobs.</dd>
+<dt>--state-dir PATH</dt><dd>State directory (default <code>/var/lib/validity</code>).</dd>
+<dt>--log-level LEVEL</dt><dd><code>error</code>, <code>warn</code>, <code>info</code> (default) or <code>debug</code>.</dd>
+<dt>--trace-sensor-traffic</dt><dd>Log every sensor command, reply and interrupt: opcode, length and status only, never the content.</dd>
+<dt>--session</dt><dd>Serve on the session bus (development).</dd>
+<dt>--address ADDRESS</dt><dd>Serve on the bus at ADDRESS (tests).</dd>
+</dl>
+<h3>Configuration</h3>
+<p>Every setting is optional; the command line wins. Copy <code>/usr/share/doc/validity-daemon/validity.toml.example</code> to <code>/etc/validity/validity.toml</code>.</p>
+<pre><code>state_dir = "/var/lib/validity"
+vendor_dll = "/var/lib/validity/vendor/synaWudfBioUsb.dll"
+log_level = "info"
+ready_timeout_ms = 3000     # Claim / ListEnrolledFingers wait for a sensor coming up
+finger_timeout_ms = 30000   # how long a scan waits for the finger
+
+[users]                     # users enrolled under another identity
+# alice = "S-1-5-21-111111111-1111111111-1111111111-1000"</code></pre>
+<h3>Logs</h3>
+<pre><code>journalctl -u validity-daemon</code></pre>
+
+<h2 id="vendor">validity-vendor</h2>
+<p>Installs the two files the daemon needs from Lenovo's Synaptics driver package <code>nz3gf07w.exe</code>, which may not be redistributed: the driver DLL (sensor command blobs) and the sensor firmware extension. It downloads the package on this machine, checks its SHA-256, extracts the two files, checks theirs, and switches them into place in one atomic step. Already in place and intact: it does nothing and uses no network. The packages run it at installation; run it again as root if the machine was offline then.</p>
+<pre><code>validity-vendor install [--archive FILE | --url URL] [--dir DIR]
+validity-vendor check [--dir DIR]</code></pre>
+<dl>
+<dt>--archive FILE</dt><dd>Use a copy of <code>nz3gf07w.exe</code> already on disk (no network).</dd>
+<dt>--url URL</dt><dd>Download from a mirror instead of Lenovo; same SHA-256 check. Default from <code>VALIDITY_VENDOR_URL</code>.</dd>
+<dt>--dir DIR</dt><dd>Installation directory (default <code>/var/lib/validity</code>); files land in <code>DIR/vendor</code>.</dd>
+</dl>
+<p>Exit status: 0 done or already in place, 1 error, 2 usage error, 3 download failed, 4 (<code>check</code>) files missing or damaged. Password login never depends on these files: without them the reader is simply unavailable.</p>
+
+<h2 id="pam">pam_validity.so and the login profile</h2>
+<p>A small PAM module that asks the service to verify the user's finger. It succeeds only on a match; anything else (no service, no reader, no finger enrolled, a timeout, an error) fails quickly so the stack falls back to the password. It shows no prompt.</p>
+<dl>
+<dt>max-tries=N</dt><dd>Fingers refused before the module fails (default 3).</dd>
+<dt>timeout=N</dt><dd>Seconds to wait for a finger per attempt, 1 to 3600 (default 30).</dd>
+<dt>confirm</dt><dd>After a match, say <code>Access granted</code> (for LightDM, whose greeter then waits for Enter).</dd>
+<dt>bus=ADDRESS</dt><dd>Use this D-Bus address instead of the system bus (tests).</dd>
+</dl>
+<p>Unknown or invalid arguments are ignored: a typo never locks anyone out.</p>
+<h3>The <code>validity-fprint</code> profile (Debian, Ubuntu)</h3>
+<p>Off by default. On the LightDM greeter and lock screen the password comes first, as without a reader: type it and you are in. To use the finger, press Enter on an empty password, touch the reader, wait for <code>Access granted</code>, press Enter. Everywhere else (sudo, su, polkit) the finger is asked first for 10 seconds, then the password.</p>
+<pre><code>sudo pam-auth-update --enable validity-fprint    # turn it on
+sudo pam-auth-update --disable validity-fprint   # back to password only</code></pre>
+<p>The profile is never <code>required</code>: the password always works.</p>
+
+<h2 id="app">Fingerprints (fingerprint-settings)</h2>
+<p>A one-screen desktop app, in English or French, for people who have never used a fingerprint reader: it registers or removes the right index finger. A progress bar fills with each good touch; a touch that did not take is not an error. Every result is one plain sentence that says what to do next. It works with any fprintd-compatible service.</p>
+<pre><code>fingerprint-settings</code></pre>
+<p>Or find <em>Fingerprints</em> (<em>Empreintes digitales</em>) in the applications menu. Run it from the desktop session itself: the system asks the session's permission to use the reader.</p>
+
+<h2 id="fprintd">fprintd's command-line tools</h2>
+<p>They talk to the same D-Bus API, so they work unchanged:</p>
+<pre><code>fprintd-list $USER                         # registered fingers
+fprintd-enroll -f right-index-finger       # register a finger
+fprintd-verify                              # check a finger
+fprintd-delete $USER -f right-index-finger # remove one</code></pre>
+<p>Run as root to act on another user.</p>
+
+<footer>Source and issues: <a href="https://github.com/validity-rs/validity-rs">validity-rs</a> · <a href="https://github.com/validity-rs/fingerprint-settings">fingerprint-settings</a>. MIT licensed.</footer>
+</main>
+</body>
+</html>
